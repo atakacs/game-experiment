@@ -50,7 +50,6 @@ public class Game extends SimpleApplication implements ActionListener {
         //app.setSettings(settings);
 
         app.start();
-
     }
 
     private final void initTerrain() {
@@ -128,6 +127,10 @@ public class Game extends SimpleApplication implements ActionListener {
                 new RigidBodyControl(10.0f);
 
         grenade.addControl(bulletBodyControl);
+        grenade.addControl(new DestructionControl(spatial -> {
+            System.out.println("BOOM!");
+            createExplosion(spatial.getLocalTranslation());
+        }, 2000L));
 
         bulletAppState.getPhysicsSpace().add(bulletBodyControl);
 
@@ -136,6 +139,20 @@ public class Game extends SimpleApplication implements ActionListener {
                 cam.getDirection().mult(50.0f));
 
         return grenade;
+    }
+
+    private void createExplosion(final Vector3f location) {
+        final Sphere sphere = new Sphere(20, 20, 0.5f);
+        final Geometry grenade = new Geometry("Grenade", sphere);
+
+        final Material grenadeMaterial = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        grenadeMaterial.setColor("Color", ColorRGBA.Blue);
+        grenade.setMaterial(grenadeMaterial);
+
+        grenade.setLocalTranslation(location);
+
+        rootNode.attachChild(grenade);
+
     }
 
     @Override
