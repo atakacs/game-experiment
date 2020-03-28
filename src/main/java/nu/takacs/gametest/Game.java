@@ -22,8 +22,14 @@ import com.jme3.terrain.geomipmap.TerrainQuad;
 import com.jme3.terrain.heightmap.AbstractHeightMap;
 import com.jme3.terrain.heightmap.ImageBasedHeightMap;
 import com.jme3.texture.Texture;
+import com.jme3.util.SkyFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class Game extends SimpleApplication implements ActionListener {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Game.class);
 
     private BulletAppState bulletAppState;
 
@@ -35,21 +41,56 @@ public class Game extends SimpleApplication implements ActionListener {
     private Material terrainMaterial;
     private RigidBodyControl terrainBodyControl;
 
-
     //Temporary vectors used on each frame.
     //They here to avoid instanciating new vectors on each frame
     private Vector3f camDir = new Vector3f();
     private Vector3f camLeft = new Vector3f();
 
     public static void main(String[] args) {
+        try {
+            Game app = new Game();
 
-        Game app = new Game();
+            //AppSettings settings = new AppSettings(true);
+            //settings.setTitle("The Little Bunny Game");
+            //app.setSettings(settings);
 
-        //AppSettings settings = new AppSettings(true);
-        //settings.setTitle("The Little Bunny Game");
-        //app.setSettings(settings);
+            app.start();
+        } catch (final Exception e) {
+            LOG.error("Unhandled exception", e);
+        }
+    }
 
-        app.start();
+    @Override
+    public void simpleInitApp() {
+        bulletAppState = new BulletAppState();
+        stateManager.attach(bulletAppState);
+
+        //bulletAppState.setDebugEnabled(true);
+
+        // We re-use the flyby camera for rotation, while positioning is handled by physics
+        viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
+        flyCam.setMoveSpeed(100);
+
+        setUpKeys();
+
+        getRootNode().attachChild(SkyFactory.createSky(
+                getAssetManager(), "Textures/Sky/Bright/BrightSky.dds",
+                SkyFactory.EnvMapType.CubeMap));
+
+        initTerrain();
+
+        final CapsuleCollisionShape playerCapsuleShape = new CapsuleCollisionShape(1.5f, 6f, 1);
+        player = new CharacterControl(playerCapsuleShape, 0.05f);
+        player.setJumpSpeed(20);
+        player.setFallSpeed(30);
+
+        bulletAppState.getPhysicsSpace().add(terrainBodyControl);
+        bulletAppState.getPhysicsSpace().add(player);
+
+        terrainBodyControl.setRestitution(0);
+
+        player.setGravity(new Vector3f(0, -50f, 0));
+        player.setPhysicsLocation(new Vector3f(0, 40, 0));
     }
 
     private final void initTerrain() {
@@ -108,6 +149,16 @@ public class Game extends SimpleApplication implements ActionListener {
         /** 5. The LOD (level of detail) depends on were the camera is: */
         TerrainLodControl control = new TerrainLodControl(terrain, getCamera());
         terrain.addControl(control);
+
+        // We set up collision detection for the scene by creating a
+        // compound collision shape and a static RigidBodyControl with mass zero.
+        final CollisionShape sceneShape =
+                CollisionShapeFactory.createMeshShape(terrain);
+        terrainBodyControl = new RigidBodyControl(sceneShape, 0);
+
+        terrain.addControl(terrainBodyControl);
+
+        rootNode.attachChild(terrain);
     }
 
     private Geometry createGrenade() {
@@ -128,7 +179,7 @@ public class Game extends SimpleApplication implements ActionListener {
 
         grenade.addControl(bulletBodyControl);
         grenade.addControl(new DestructionControl(spatial -> {
-            System.out.println("BOOM!");
+            LOG.debug("BOOM!");
             createExplosion(spatial.getLocalTranslation());
         }, 2000L));
 
@@ -152,46 +203,6 @@ public class Game extends SimpleApplication implements ActionListener {
         grenade.setLocalTranslation(location);
 
         rootNode.attachChild(grenade);
-
-    }
-
-    @Override
-    public void simpleInitApp() {
-        /** Set up Physics */
-        bulletAppState = new BulletAppState();
-        stateManager.attach(bulletAppState);
-
-        //bulletAppState.setDebugEnabled(true);
-
-        // We re-use the flyby camera for rotation, while positioning is handled by physics
-        viewPort.setBackgroundColor(new ColorRGBA(0.7f, 0.8f, 1f, 1f));
-        flyCam.setMoveSpeed(100);
-        setUpKeys();
-
-        initTerrain();
-
-        // We set up collision detection for the scene by creating a
-        // compound collision shape and a static RigidBodyControl with mass zero.
-        CollisionShape sceneShape =
-                CollisionShapeFactory.createMeshShape(terrain);
-        terrainBodyControl = new RigidBodyControl(sceneShape, 0);
-
-        terrain.addControl(terrainBodyControl);
-
-        CapsuleCollisionShape playerCapsuleShape = new CapsuleCollisionShape(1.5f, 6f, 1);
-        player = new CharacterControl(playerCapsuleShape, 0.05f);
-        player.setJumpSpeed(20);
-        player.setFallSpeed(30);
-
-        rootNode.attachChild(terrain);
-
-        bulletAppState.getPhysicsSpace().add(terrainBodyControl);
-        bulletAppState.getPhysicsSpace().add(player);
-
-        terrainBodyControl.setRestitution(0);
-
-        player.setGravity(new Vector3f(0, -50f, 0));
-        player.setPhysicsLocation(new Vector3f(0, 40, 0));
     }
 
     @Override
@@ -234,7 +245,7 @@ public class Game extends SimpleApplication implements ActionListener {
             }
         } else if (binding.equals("Shoot")) {
             if (isPressed) {
-                System.out.println("SHOOT!");
+                LOG.debug("SHOOT!");
                 createGrenade();
             }
         }

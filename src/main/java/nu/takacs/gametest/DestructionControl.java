@@ -11,8 +11,6 @@ import java.util.function.Consumer;
 
 public class DestructionControl extends AbstractControl {
 
-    public static final String USER_DATA_KEY_CREATED_AT = "createdAt";
-
     private final Instant blowUpAt;
     private final Consumer<Spatial> onBlowup;
 
