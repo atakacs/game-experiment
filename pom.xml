@@ -48,6 +48,11 @@
         </dependency>
         <dependency>
             <groupId>org.jmonkeyengine</groupId>
+            <artifactId>jme3-plugins</artifactId>
+            <version>${jmonkey.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jmonkeyengine</groupId>
             <artifactId>jme3-testdata</artifactId>
             <version>3.3.0-beta1</version>
         </dependency>
