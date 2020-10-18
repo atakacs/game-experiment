@@ -18,12 +18,9 @@ import com.jme3.math.Vector3f;
 import com.jme3.scene.Spatial;
 import com.jme3.terrain.geomipmap.TerrainLodControl;
 import com.jme3.terrain.geomipmap.TerrainQuad;
-import com.jme3.terrain.heightmap.AbstractHeightMap;
-import com.jme3.terrain.heightmap.ImageBasedHeightMap;
 import com.jme3.texture.Texture;
 import com.jme3.util.SkyFactory;
-import nu.takacs.gametest.factory.ExplosionFactory;
-import nu.takacs.gametest.factory.GrenadeFactory;
+import nu.takacs.gametest.factory.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +30,7 @@ public class Game extends SimpleApplication implements ActionListener {
     private static final Logger LOG = LoggerFactory.getLogger(Game.class);
 
     private static final float GRENADE_EXPLOSION_CUTOFF = 40.0f;
-    private static final float GRENADE_FORCE_SIZE = 2000.0f;
+    private static final float GRENADE_FORCE_SIZE = 2500.0f;
 
     private BulletAppState bulletAppState;
 
@@ -46,7 +43,10 @@ public class Game extends SimpleApplication implements ActionListener {
     private RigidBodyControl terrainBodyControl;
 
     private ExplosionFactory explosionFactory;
+    private FireFactory fireFactory;
     private GrenadeFactory grenadeFactory;
+    private TerrainFactory terrainFactory;
+    private BoxFactory boxFactory;
 
     //Temporary vectors used on each frame.
     //They here to avoid instanciating new vectors on each frame
@@ -69,8 +69,11 @@ public class Game extends SimpleApplication implements ActionListener {
 
     @Override
     public void simpleInitApp() {
+        terrainFactory = new TerrainFactory(this);
         explosionFactory = new ExplosionFactory(this);
+        fireFactory = new FireFactory(this);
         grenadeFactory = new GrenadeFactory(this);
+        boxFactory = new BoxFactory(this, fireFactory);
 
         bulletAppState = new BulletAppState();
         stateManager.attach(bulletAppState);
@@ -97,66 +100,15 @@ public class Game extends SimpleApplication implements ActionListener {
 
         bulletAppState.getPhysicsSpace().add(player);
 
-        terrainBodyControl.setRestitution(0);
-
         player.setGravity(new Vector3f(0, -50f, 0));
         player.setPhysicsLocation(new Vector3f(-200, -10, 0));
     }
 
-    private final void initTerrain() {
-        /** 1. Create terrain material and load four textures into it. */
-        terrainMaterial = new Material(assetManager,
-                "Common/MatDefs/Terrain/Terrain.j3md");
-
-        /** 1.1) Add ALPHA map (for red-blue-green coded splat textures) */
-        terrainMaterial.setTexture("Alpha", assetManager.loadTexture(
-                "Textures/Terrain/splat/alphamap.png"));
-
-        /** 1.2) Add GRASS texture into the red layer (Tex1). */
-        final Texture grass = assetManager.loadTexture(
-                "Textures/Terrain/splat/grass.jpg");
-        grass.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex1", grass);
-        terrainMaterial.setFloat("Tex1Scale", 64f);
-
-        /** 1.3) Add DIRT texture into the green layer (Tex2) */
-        final Texture dirt = assetManager.loadTexture(
-                "Textures/Terrain/splat/dirt.jpg");
-        dirt.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex2", dirt);
-        terrainMaterial.setFloat("Tex2Scale", 32f);
-
-        /** 1.4) Add ROAD texture into the blue layer (Tex3) */
-        Texture rock = assetManager.loadTexture(
-                "Textures/Terrain/splat/road.jpg");
-        rock.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex3", rock);
-        terrainMaterial.setFloat("Tex3Scale", 128f);
-
-        /** 2. Create the height map */
-        final Texture heightMapImage = assetManager.loadTexture(
-                "Textures/Terrain/splat/mountains512.png");
-        final AbstractHeightMap heightmap = new ImageBasedHeightMap(heightMapImage.getImage());
-        heightmap.load();
-
-        /** 3. We have prepared material and heightmap.
-         * Now we create the actual terrain:
-         * 3.1) Create a TerrainQuad and name it "my terrain".
-         * 3.2) A good value for terrain tiles is 64x64 -- so we supply 64+1=65.
-         * 3.3) We prepared a heightmap of size 512x512 -- so we supply 512+1=513.
-         * 3.4) As LOD step scale we supply Vector3f(1,1,1).
-         * 3.5) We supply the prepared heightmap itself.
-         */
-        int patchSize = 65;
-        terrain = new TerrainQuad("my terrain", patchSize, 513, heightmap.getHeightMap());
-
-        /** 4. We give the terrain its material, position & scale it, and attach it. */
-        terrain.setMaterial(terrainMaterial);
-        terrain.setLocalTranslation(0, -100, 0);
-        terrain.setLocalScale(2f, 1f, 2f);
+    private void initTerrain() {
+        terrain = terrainFactory.createTerrain();
 
         /** 5. The LOD (level of detail) depends on were the camera is: */
-        TerrainLodControl control = new TerrainLodControl(terrain, getCamera());
+        final var control = new TerrainLodControl(terrain, getCamera());
         terrain.addControl(control);
 
         // We set up collision detection for the scene by creating a
@@ -173,17 +125,23 @@ public class Game extends SimpleApplication implements ActionListener {
     }
 
     private void createGrenade() {
-        final var grenade = grenadeFactory.createGrenade(
-                cam.getLocation()
-                        .add(cam.getDirection().normalizeLocal().mult(4.0f)));
+        final var grenade = grenadeFactory.createGrenade();
+        LOG.debug("Camera rotation: {}", cam.getRotation());
+
+        //var x = new Quaternion().fromAngleAxis(-3.1415f/2, new Vector3f(1.0f, 0, 0));
+        grenade.rotate(cam.getRotation());
+        grenade.rotate(-3.1415f / 2, 0, 0);
+
+        grenade.setLocalTranslation(cam.getLocation()
+                .add(cam.getDirection().normalizeLocal().mult(4.0f)));
 
         rootNode.attachChild(grenade);
 
-        final RigidBodyControl bulletBodyControl =
-                new RigidBodyControl(10.0f);
+        final RigidBodyControl grenadeBodyControl =
+                new RigidBodyControl(5.0f);
 
-        grenade.addControl(bulletBodyControl);
-        grenade.addControl(new DestructionControl(spatial -> {
+        grenade.addControl(grenadeBodyControl);
+        grenade.addControl(new TimedDestructionControl(spatial -> {
             bulletAppState.getPhysicsSpace().removeAll(spatial);
 
             LOG.debug("BOOM!");
@@ -193,11 +151,10 @@ public class Game extends SimpleApplication implements ActionListener {
             applyExplosionForce(spatial.getLocalTranslation());
         }, 2000L));
 
-        bulletAppState.getPhysicsSpace().add(bulletBodyControl);
+        bulletAppState.getPhysicsSpace().add(grenadeBodyControl);
 
-        bulletBodyControl.setRestitution(0f);
-        bulletBodyControl.setLinearVelocity(
-                cam.getDirection().mult(20.0f));
+        grenadeBodyControl.setLinearVelocity(
+                cam.getDirection().mult(40.0f));
     }
 
     private void applyExplosionForce(final Vector3f translation) {
@@ -206,7 +163,10 @@ public class Game extends SimpleApplication implements ActionListener {
                 .forEach(body -> {
                     LOG.debug("Body translation={}, kinematic={}, userobject={}",
                             body.getPhysicsLocation(), body.isKinematic(), body.getUserObject());
-                    if (!(body.getUserObject() instanceof TerrainQuad)) {
+                    final var spatial = (Spatial)body.getUserObject();
+
+                    if (!(spatial instanceof TerrainQuad)
+                            && spatial.getUserData("object_type") != "grenade") {
 
                         final Vector3f diff = body
                                 .getPhysicsLocation()
@@ -214,8 +174,8 @@ public class Game extends SimpleApplication implements ActionListener {
 
                         final float distance = diff.length();
 
-                        if(distance < GRENADE_EXPLOSION_CUTOFF) {
-                            final float normalizedDistance = (distance/GRENADE_EXPLOSION_CUTOFF);
+                        if (distance < GRENADE_EXPLOSION_CUTOFF) {
+                            final float normalizedDistance = (distance / GRENADE_EXPLOSION_CUTOFF);
                             final float impulseLength = GRENADE_FORCE_SIZE
                                     * (1 - normalizedDistance * normalizedDistance);
 
@@ -224,6 +184,12 @@ public class Game extends SimpleApplication implements ActionListener {
 
                             body.applyImpulse(
                                     impulse, new Vector3f(0, 0, 0));
+
+                            final var currentHealth = (Integer)spatial.getUserData("health");
+                            if(currentHealth != null) {
+                                spatial.setUserData("health",
+                                        currentHealth - (int)(40.0f*(1.0f - normalizedDistance * normalizedDistance)));
+                            }
                         }
                     }
                 });
@@ -231,6 +197,15 @@ public class Game extends SimpleApplication implements ActionListener {
 
     private void createNpc() {
         final Spatial npcSpatial = assetManager.loadModel("Models/Oto/Oto.mesh.xml");
+
+        final Material npcMaterial = new Material(assetManager,
+                "Common/MatDefs/Misc/Unshaded.j3md");
+
+        final Texture npcTexture = assetManager.loadTexture("Models/Oto/Oto.jpg");
+        //npcTexture.setWrap(Texture.WrapMode.EdgeClamp);
+        npcMaterial.setTexture("ColorMap", npcTexture);
+
+        npcSpatial.setMaterial(npcMaterial);
 
 //        final CapsuleCollisionShape collisionShape =
 //                 CollisionShapeFactory.createBoxShape()
@@ -248,6 +223,41 @@ public class Game extends SimpleApplication implements ActionListener {
         rootNode.attachChild(npcSpatial);
     }
 
+    private void createBox() {
+        final Spatial box = boxFactory.createBox();
+
+        final var healthDestructionControl = new HealthDestructionControl(spatial -> {
+            bulletAppState.getPhysicsSpace().removeAll(spatial);
+
+            LOG.debug("BOOM!");
+            rootNode.attachChild(
+                    explosionFactory.createExplosion(spatial.getLocalTranslation()));
+
+            applyExplosionForce(spatial.getLocalTranslation());
+        });
+
+        box.addControl(healthDestructionControl);
+
+        final RigidBodyControl boxControl =
+                new RigidBodyControl(100.0f);
+
+        box.addControl(boxControl);
+
+        boxControl.setPhysicsLocation(cam.getLocation()
+                .add(cam.getDirection().normalize().mult(20.0f)));
+
+        bulletAppState.getPhysicsSpace().add(boxControl);
+
+        rootNode.attachChild(box);
+    }
+
+
+    private void createFire() {
+        final Spatial fire = fireFactory.createFire(cam.getLocation()
+                .add(cam.getDirection().normalize().mult(20.0f)));
+
+        rootNode.attachChild(fire);
+    }
     @Override
     public void simpleUpdate(float tpf) {
         final Vector3f walkingPlane
@@ -295,7 +305,18 @@ public class Game extends SimpleApplication implements ActionListener {
                 LOG.debug("Interacting!");
                 createNpc();
             }
+        } else if (binding.equals("Interact2")) {
+            if (isPressed) {
+                LOG.debug("Interacting2!");
+                createBox();
+            }
+        } else if (binding.equals("Fire")) {
+            if (isPressed) {
+                LOG.debug("Fire!");
+                createFire();
+            }
         }
+
     }
 
     private void setUpKeys() {
@@ -307,6 +328,8 @@ public class Game extends SimpleApplication implements ActionListener {
 
         inputManager.addMapping("Shoot", new MouseButtonTrigger(MouseInput.BUTTON_LEFT));
         inputManager.addMapping("Interact", new KeyTrigger(KeyInput.KEY_E));
+        inputManager.addMapping("Interact2", new KeyTrigger(KeyInput.KEY_R));
+        inputManager.addMapping("Fire", new KeyTrigger(KeyInput.KEY_F));
 
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
@@ -315,5 +338,8 @@ public class Game extends SimpleApplication implements ActionListener {
         inputManager.addListener(this, "Jump");
         inputManager.addListener(this, "Shoot");
         inputManager.addListener(this, "Interact");
+        inputManager.addListener(this, "Interact2");
+        inputManager.addListener(this, "Fire");
+
     }
 }

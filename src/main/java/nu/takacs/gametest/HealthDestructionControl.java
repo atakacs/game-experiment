@@ -5,24 +5,21 @@ import com.jme3.renderer.ViewPort;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.control.AbstractControl;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.function.Consumer;
 
-public class DestructionControl extends AbstractControl {
+public class HealthDestructionControl extends AbstractControl {
 
-    private final Instant blowUpAt;
     private final Consumer<Spatial> onBlowup;
 
-    public DestructionControl(final Consumer<Spatial> onBlowup, final Long ttlMillis) {
+    public HealthDestructionControl(final Consumer<Spatial> onBlowup) {
         this.onBlowup = onBlowup;
 
-        blowUpAt = Instant.now().plus(ttlMillis, ChronoUnit.MILLIS);
     }
 
     @Override
     protected void controlUpdate(final float tpf) {
-        if (!Instant.now().isBefore(blowUpAt)) {
+        final Object o = spatial.getUserData("health");
+        if(o instanceof Integer && ((Integer)o) < 1) {
             spatial.removeFromParent();
             onBlowup.accept(spatial);
         }
