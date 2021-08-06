@@ -1,28 +1,45 @@
 package nu.takacs.gametest;
 
+import com.jme3.anim.AnimClip;
+import com.jme3.anim.AnimComposer;
+import com.jme3.anim.tween.Tween;
+import com.jme3.anim.tween.Tweens;
+import com.jme3.anim.tween.action.Action;
+import com.jme3.anim.tween.action.BaseAction;
+import com.jme3.anim.tween.action.LinearBlendSpace;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.collision.shapes.CapsuleCollisionShape;
 import com.jme3.bullet.collision.shapes.CollisionShape;
+import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.CharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.bullet.util.CollisionShapeFactory;
+import com.jme3.export.binary.BinaryExporter;
 import com.jme3.input.KeyInput;
 import com.jme3.input.MouseInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
 import com.jme3.input.controls.MouseButtonTrigger;
-import com.jme3.material.Material;
+import com.jme3.light.AmbientLight;
+import com.jme3.light.PointLight;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
+import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.system.AppSettings;
 import com.jme3.terrain.geomipmap.TerrainLodControl;
 import com.jme3.terrain.geomipmap.TerrainQuad;
-import com.jme3.texture.Texture;
 import com.jme3.util.SkyFactory;
+import nu.takacs.gametest.control.HealthDestructionControl;
+import nu.takacs.gametest.control.TimedDestructionControl;
 import nu.takacs.gametest.factory.*;
+import nu.takacs.gametest.hud.Hud;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
 
 
 public class Game extends SimpleApplication implements ActionListener {
@@ -38,9 +55,7 @@ public class Game extends SimpleApplication implements ActionListener {
     private Vector3f walkDirection = new Vector3f();
     private boolean left = false, right = false, up = false, down = false;
 
-    private TerrainQuad terrain;
-    private Material terrainMaterial;
-    private RigidBodyControl terrainBodyControl;
+    private Hud hud;
 
     private ExplosionFactory explosionFactory;
     private FireFactory fireFactory;
@@ -48,8 +63,6 @@ public class Game extends SimpleApplication implements ActionListener {
     private TerrainFactory terrainFactory;
     private BoxFactory boxFactory;
 
-    //Temporary vectors used on each frame.
-    //They here to avoid instanciating new vectors on each frame
     private Vector3f camDir = new Vector3f();
     private Vector3f camLeft = new Vector3f();
 
@@ -57,9 +70,13 @@ public class Game extends SimpleApplication implements ActionListener {
         try {
             Game app = new Game();
 
-            //AppSettings settings = new AppSettings(true);
-            //settings.setTitle("The Little Bunny Game");
-            //app.setSettings(settings);
+            app.setShowSettings(false);
+
+            final var settings = new AppSettings(true);
+            settings.setTitle("Alexander's Playground");
+            settings.setResolution(1280, 768);
+
+            app.setSettings(settings);
 
             app.start();
         } catch (final Exception e) {
@@ -67,8 +84,27 @@ public class Game extends SimpleApplication implements ActionListener {
         }
     }
 
+    private void saveState() {
+        LOG.info("Saving game state...");
+
+        BinaryExporter exporter = BinaryExporter.getInstance();
+        File file = new File("saved-state.j3o");
+        try {
+            exporter.save(rootNode, file);
+        } catch (IOException e) {
+            LOG.error("Failed to save game state", e);
+        }
+
+        LOG.info("Game state saved");
+    }
+
     @Override
     public void simpleInitApp() {
+        setDisplayStatView(false);
+        setDisplayFps(false);
+
+        hud = new Hud(this, guiFont);
+
         terrainFactory = new TerrainFactory(this);
         explosionFactory = new ExplosionFactory(this);
         fireFactory = new FireFactory(this);
@@ -92,8 +128,8 @@ public class Game extends SimpleApplication implements ActionListener {
 
         initTerrain();
 
-        final CapsuleCollisionShape playerCapsuleShape =
-                new CapsuleCollisionShape(1.5f, 6f, 1);
+        final var playerCapsuleShape =
+                new CapsuleCollisionShape(0.5f, 2f, 1);
         player = new CharacterControl(playerCapsuleShape, 0.05f);
         player.setJumpSpeed(20);
         player.setFallSpeed(30);
@@ -101,21 +137,33 @@ public class Game extends SimpleApplication implements ActionListener {
         bulletAppState.getPhysicsSpace().add(player);
 
         player.setGravity(new Vector3f(0, -50f, 0));
-        player.setPhysicsLocation(new Vector3f(-200, -10, 0));
+        player.setPhysicsLocation(new Vector3f(0, 20, -100));
     }
 
     private void initTerrain() {
-        terrain = terrainFactory.createTerrain();
+
+        var terrain = terrainFactory.createTerrain();
 
         /** 5. The LOD (level of detail) depends on were the camera is: */
         final var control = new TerrainLodControl(terrain, getCamera());
         terrain.addControl(control);
 
-        // We set up collision detection for the scene by creating a
-        // compound collision shape and a static RigidBodyControl with mass zero.
+        PointLight sunPointLight = new PointLight();
+        sunPointLight.setColor(ColorRGBA.White);
+        sunPointLight.setRadius(1000f);
+        sunPointLight.setPosition(new Vector3f(0.0f, 30.0f, 0.0f));
+        rootNode.addLight(sunPointLight);
+
+        AmbientLight al = new AmbientLight();
+        al.setColor(ColorRGBA.White.mult(0.5f));
+        rootNode.addLight(al);
+
+//        var terrain = assetManager.loadModel("Scenes/room.j3o");
+//        terrain.setLocalTranslation(0, -5.0f, 0);
+
         final CollisionShape sceneShape =
                 CollisionShapeFactory.createMeshShape(terrain);
-        terrainBodyControl = new RigidBodyControl(sceneShape, 0);
+        var terrainBodyControl = new RigidBodyControl(sceneShape, 0);
 
         terrain.addControl(terrainBodyControl);
 
@@ -126,11 +174,9 @@ public class Game extends SimpleApplication implements ActionListener {
 
     private void createGrenade() {
         final var grenade = grenadeFactory.createGrenade();
-        LOG.debug("Camera rotation: {}", cam.getRotation());
 
-        //var x = new Quaternion().fromAngleAxis(-3.1415f/2, new Vector3f(1.0f, 0, 0));
         grenade.rotate(cam.getRotation());
-        grenade.rotate(-3.1415f / 2, 0, 0);
+        //grenade.rotate(-3.1415f / 2, 0, 0);
 
         grenade.setLocalTranslation(cam.getLocation()
                 .add(cam.getDirection().normalizeLocal().mult(4.0f)));
@@ -158,19 +204,20 @@ public class Game extends SimpleApplication implements ActionListener {
     }
 
     private void applyExplosionForce(final Vector3f translation) {
+
+        //TODO: use visitor https://wiki.jmonkeyengine.org/docs/3.4/core/scene/traverse_scenegraph.html
+
         bulletAppState.getPhysicsSpace()
                 .getRigidBodyList()
                 .forEach(body -> {
-                    LOG.debug("Body translation={}, kinematic={}, userobject={}",
-                            body.getPhysicsLocation(), body.isKinematic(), body.getUserObject());
-                    final var spatial = (Spatial)body.getUserObject();
+                    final var spatial = (Spatial) body.getUserObject();
 
                     if (!(spatial instanceof TerrainQuad)
                             && spatial.getUserData("object_type") != "grenade") {
 
                         final Vector3f diff = body
                                 .getPhysicsLocation()
-                                .subtract(translation);
+                                .subtractLocal(translation);
 
                         final float distance = diff.length();
 
@@ -185,10 +232,10 @@ public class Game extends SimpleApplication implements ActionListener {
                             body.applyImpulse(
                                     impulse, new Vector3f(0, 0, 0));
 
-                            final var currentHealth = (Integer)spatial.getUserData("health");
-                            if(currentHealth != null) {
+                            final var currentHealth = (Integer) spatial.getUserData("health");
+                            if (currentHealth != null) {
                                 spatial.setUserData("health",
-                                        currentHealth - (int)(40.0f*(1.0f - normalizedDistance * normalizedDistance)));
+                                        currentHealth - (int) (40.0f * (1.0f - normalizedDistance * normalizedDistance)));
                             }
                         }
                     }
@@ -196,31 +243,49 @@ public class Game extends SimpleApplication implements ActionListener {
     }
 
     private void createNpc() {
-        final Spatial npcSpatial = assetManager.loadModel("Models/Oto/Oto.mesh.xml");
+//        final var sphere = new Sphere(50, 50, 1.0f);
+//        final var npcSpatial = new Geometry("npcSphere", sphere);
+//
+//        final var npcMaterial = new Material(getAssetManager(),
+//                "Common/MatDefs/Light/Lighting.j3md");
+//
+//        npcMaterial.setBoolean("UseMaterialColors",true);
+//        npcMaterial.setColor("Ambient", ColorRGBA.Green);
+//        npcMaterial.setColor("Diffuse", ColorRGBA.Green);
+//
+//        npcSpatial.setMaterial(npcMaterial);
+//
+        final var npcModel = assetManager.loadModel("Models/Oto/Oto.mesh.xml");
 
-        final Material npcMaterial = new Material(assetManager,
-                "Common/MatDefs/Misc/Unshaded.j3md");
+        npcModel.setLocalScale(0.25f);
+        npcModel.setLocalTranslation(0.0f, 1.0f, 0.0f);
 
-        final Texture npcTexture = assetManager.loadTexture("Models/Oto/Oto.jpg");
-        //npcTexture.setWrap(Texture.WrapMode.EdgeClamp);
-        npcMaterial.setTexture("ColorMap", npcTexture);
+        final var npcSpatial = new Node("npcNode");
+        npcSpatial.attachChild(npcModel);
+        final var animComposer = npcSpatial.getControl(AnimComposer.class);
+        animComposer.actionBlended("Attack", new LinearBlendSpace(0f, 0.5f), "Dodge");
+        for (AnimClip animClip : animComposer.getAnimClips()) {
+            Action action = animComposer.action(animClip.getName());
+            if(!"stand".equals(animClip.getName())) {
+                action = new BaseAction(Tweens.sequence(action, Tweens.callMethod(this, "backToStand", animComposer)));
+            }
+            animComposer.addAction(animClip.getName(), action);
+        }
 
-        npcSpatial.setMaterial(npcMaterial);
+        final var npcControl = new BetterCharacterControl(1.0f, 2f, 50f);
+        npcSpatial.addControl(npcControl);
+        bulletAppState.getPhysicsSpace().add(npcControl);
 
-//        final CapsuleCollisionShape collisionShape =
-//                 CollisionShapeFactory.createBoxShape()
-
-        final RigidBodyControl bodyControl =
-                new RigidBodyControl(100.0f);
-
-        npcSpatial.addControl(bodyControl);
-
-        bodyControl.setPhysicsLocation(cam.getLocation()
-                .add(cam.getDirection().normalize().mult(20.0f)));
-
-        bulletAppState.getPhysicsSpace().add(bodyControl);
+        final var spawnLocation = cam.getLocation()
+                .addLocal(cam.getDirection().normalizeLocal().multLocal(20.0f));
+        LOG.info("Spawn location = {}", spawnLocation);
+        npcControl.warp(spawnLocation);
 
         rootNode.attachChild(npcSpatial);
+    }
+
+    public Tween backToStand(AnimComposer animComposer) {
+        return animComposer.setCurrentAction("stand");
     }
 
     private void createBox() {
@@ -258,6 +323,7 @@ public class Game extends SimpleApplication implements ActionListener {
 
         rootNode.attachChild(fire);
     }
+
     @Override
     public void simpleUpdate(float tpf) {
         final Vector3f walkingPlane
@@ -279,7 +345,12 @@ public class Game extends SimpleApplication implements ActionListener {
             walkDirection.addLocal(camDir.negate().mult(walkingPlane));
         }
         player.setWalkDirection(walkDirection);
-        cam.setLocation(player.getPhysicsLocation());
+
+        final var playerPosition = player.getPhysicsLocation();
+        cam.setLocation(playerPosition);
+
+//        hud.append(String.format("playerPosition = (%.2f, %.2f, %.2f)",
+//                playerPosition.x, playerPosition.y, playerPosition.z));
     }
 
     @Override
@@ -299,21 +370,29 @@ public class Game extends SimpleApplication implements ActionListener {
         } else if (binding.equals("Shoot")) {
             if (isPressed) {
                 createGrenade();
+                hud.consoleAppend("Grenade!");
             }
         } else if (binding.equals("Interact")) {
             if (isPressed) {
-                LOG.debug("Interacting!");
                 createNpc();
+                hud.consoleAppend("Creating NPC!");
             }
         } else if (binding.equals("Interact2")) {
             if (isPressed) {
-                LOG.debug("Interacting2!");
                 createBox();
             }
         } else if (binding.equals("Fire")) {
             if (isPressed) {
-                LOG.debug("Fire!");
                 createFire();
+            }
+        } else if (binding.equals("Save")) {
+            if (isPressed) {
+                saveState();
+            }
+        }else if (binding.equals("Console")) {
+            if (isPressed) {
+                hud.toggleVisibility();
+                hud.consoleAppend("toggle");
             }
         }
 
@@ -330,6 +409,8 @@ public class Game extends SimpleApplication implements ActionListener {
         inputManager.addMapping("Interact", new KeyTrigger(KeyInput.KEY_E));
         inputManager.addMapping("Interact2", new KeyTrigger(KeyInput.KEY_R));
         inputManager.addMapping("Fire", new KeyTrigger(KeyInput.KEY_F));
+        inputManager.addMapping("Save", new KeyTrigger(KeyInput.KEY_P));
+        inputManager.addMapping("Console", new KeyTrigger(KeyInput.KEY_1));
 
         inputManager.addListener(this, "Left");
         inputManager.addListener(this, "Right");
@@ -340,6 +421,7 @@ public class Game extends SimpleApplication implements ActionListener {
         inputManager.addListener(this, "Interact");
         inputManager.addListener(this, "Interact2");
         inputManager.addListener(this, "Fire");
-
+        inputManager.addListener(this, "Save");
+        inputManager.addListener(this, "Console");
     }
 }

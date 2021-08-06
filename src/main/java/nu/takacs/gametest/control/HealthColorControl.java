@@ -1,4 +1,4 @@
-package nu.takacs.gametest;
+package nu.takacs.gametest.control;
 
 import com.jme3.app.LegacyApplication;
 import com.jme3.material.Material;
@@ -13,9 +13,8 @@ public class HealthColorControl extends AbstractControl {
 
     public HealthColorControl(final LegacyApplication application) {
         this.material = new Material(application.getAssetManager(),
-                "Common/MatDefs/Misc/Unshaded.j3md");
+                "Common/MatDefs/Light/Lighting.j3md");
     }
-
 
     @Override
     protected void controlUpdate(final float tpf) {
@@ -29,8 +28,11 @@ public class HealthColorControl extends AbstractControl {
             health = 0;
         }
 
-        this.material.setColor("Color",
-                new ColorRGBA((100 - health)/100.0f, health/100.0f, 0.0f, 1.0f));
+        final var color = new ColorRGBA((100 - health)/100.0f, health/100.0f, 0.0f, 1.0f);
+
+        material.setBoolean("UseMaterialColors",true);
+        material.setColor("Ambient", color);
+        material.setColor("Diffuse", color);
         spatial.setMaterial(material);
     }
 

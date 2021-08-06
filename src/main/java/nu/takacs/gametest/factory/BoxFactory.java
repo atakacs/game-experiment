@@ -8,7 +8,7 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
-import nu.takacs.gametest.HealthColorControl;
+import nu.takacs.gametest.control.HealthColorControl;
 
 public class BoxFactory {
     private final Material boxMaterial;
@@ -20,9 +20,13 @@ public class BoxFactory {
         this.application = application;
 
         this.boxMaterial = new Material(application.getAssetManager(),
-                "Common/MatDefs/Misc/Unshaded.j3md");
+                "Common/MatDefs/Light/Lighting.j3md");
         this.fireFactory = fireFactory;
-        this.boxMaterial.setColor("Color", ColorRGBA.Green);
+
+        this.boxMaterial.setBoolean("UseMaterialColors",true);
+        this.boxMaterial.setColor("Ambient", ColorRGBA.Green);
+        this.boxMaterial.setColor("Diffuse", ColorRGBA.Green);
+
     }
 
     public Spatial createBox() {

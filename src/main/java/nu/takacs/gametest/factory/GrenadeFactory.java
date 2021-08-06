@@ -19,7 +19,7 @@ public class GrenadeFactory {
 
     public Spatial createGrenade() {
         final var grenade = application.getAssetManager()
-                .loadModel("assets/grenade.j3o");
+                .loadModel("Models/grenade.j3o");
 
         grenade.setMaterial(grenadeMaterial);
         grenade.scale(5.0f);

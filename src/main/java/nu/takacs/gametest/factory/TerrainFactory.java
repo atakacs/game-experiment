@@ -10,45 +10,41 @@ import com.jme3.texture.Texture;
 public class TerrainFactory {
 
     private final Material terrainMaterial;
-
-    private final Texture grassTexture;
-    private final Texture dirtTexture;
-    private final Texture heightMapImage;
     private final AbstractHeightMap heightMap;
 
     public TerrainFactory(final LegacyApplication application) {
         var assetManager = application.getAssetManager();
         /** 1. Create terrain material and load four textures into it. */
         terrainMaterial = new Material(assetManager,
-                "Common/MatDefs/Terrain/Terrain.j3md");
+                "Common/MatDefs/Terrain/TerrainLighting.j3md");
 
         /** 1.1) Add ALPHA map (for red-blue-green coded splat textures) */
-        terrainMaterial.setTexture("Alpha", assetManager.loadTexture(
+        terrainMaterial.setTexture("AlphaMap", assetManager.loadTexture(
                 "Textures/Terrain/splat/alphamap.png"));
 
         /** 1.2) Add GRASS texture into the red layer (Tex1). */
-        grassTexture = assetManager.loadTexture(
+        final Texture grassTexture = assetManager.loadTexture(
                 "Textures/Terrain/splat/grass.jpg");
         grassTexture.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex1", grassTexture);
-        terrainMaterial.setFloat("Tex1Scale", 64f);
+        terrainMaterial.setTexture("DiffuseMap", grassTexture);
+        terrainMaterial.setFloat("DiffuseMap_0_scale", 64f);
 
         /** 1.3) Add DIRT texture into the green layer (Tex2) */
-        dirtTexture = assetManager.loadTexture(
+        final Texture dirtTexture = assetManager.loadTexture(
                 "Textures/Terrain/splat/dirt.jpg");
         dirtTexture.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex2", dirtTexture);
-        terrainMaterial.setFloat("Tex2Scale", 32f);
+        terrainMaterial.setTexture("DiffuseMap_1", dirtTexture);
+        terrainMaterial.setFloat("DiffuseMap_1_scale", 32f);
 
         /** 1.4) Add ROAD texture into the blue layer (Tex3) */
         Texture rock = assetManager.loadTexture(
                 "Textures/Terrain/splat/road.jpg");
         rock.setWrap(Texture.WrapMode.Repeat);
-        terrainMaterial.setTexture("Tex3", rock);
-        terrainMaterial.setFloat("Tex3Scale", 128f);
+        terrainMaterial.setTexture("DiffuseMap_2", rock);
+        terrainMaterial.setFloat("DiffuseMap_2_scale", 128f);
 
         /** 2. Create the height map */
-        heightMapImage = assetManager.loadTexture(
+        final Texture heightMapImage = assetManager.loadTexture(
                 "Textures/Terrain/splat/mountains512.png");
         heightMap = new ImageBasedHeightMap(heightMapImage.getImage());
         heightMap.load();
@@ -57,14 +53,6 @@ public class TerrainFactory {
 
     public TerrainQuad createTerrain() {
 
-        /** 3. We have prepared material and heightmap.
-         * Now we create the actual terrain:
-         * 3.1) Create a TerrainQuad and name it "my terrain".
-         * 3.2) A good value for terrain tiles is 64x64 -- so we supply 64+1=65.
-         * 3.3) We prepared a heightmap of size 512x512 -- so we supply 512+1=513.
-         * 3.4) As LOD step scale we supply Vector3f(1,1,1).
-         * 3.5) We supply the prepared heightmap itself.
-         */
         int patchSize = 65;
         var terrain = new TerrainQuad("my terrain", patchSize, 513, heightMap.getHeightMap());
 
