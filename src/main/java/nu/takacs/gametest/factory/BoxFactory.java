@@ -9,6 +9,9 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import nu.takacs.gametest.control.HealthColorControl;
+import nu.takacs.gametest.control.HealthDestructionControl;
+
+import java.util.function.Consumer;
 
 public class BoxFactory {
     private final Material boxMaterial;
@@ -29,7 +32,7 @@ public class BoxFactory {
 
     }
 
-    public Spatial createBox() {
+    public Spatial createBox(final Consumer<Spatial> onKilled) {
         final var fire = fireFactory.createFire(Vector3f.ZERO);
         final var node = new Node("BoxNode");
         final var box = new Geometry("BoxGeometry", new Box(1.0f, 1.0f, 1.0f));
@@ -37,7 +40,6 @@ public class BoxFactory {
         box.setMaterial(boxMaterial);
 
         node.setUserData("object_type", "box");
-        node.setUserData("health", 100);
 
         node.attachChild(box);
         node.attachChild(fire);
@@ -45,6 +47,10 @@ public class BoxFactory {
         final var healthColorControl = new HealthColorControl(application);
 
         box.addControl(healthColorControl);
+
+        final var healthDestructionControl = new HealthDestructionControl(onKilled);
+
+        node.addControl(healthDestructionControl);
 
         return node;
     }

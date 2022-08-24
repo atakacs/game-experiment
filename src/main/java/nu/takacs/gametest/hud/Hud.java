@@ -21,8 +21,19 @@ public class Hud {
     private int currentLine = 0;
     private final Node consoleNode = new Node("hud-node");
 
-    public Hud(final SimpleApplication application, final BitmapFont font) {
+    final float displayWidth;
+    final float displayHeight;
+
+    public Hud(
+            final SimpleApplication application,
+            final BitmapFont font,
+            final float displayWidth,
+            final float displayHeight) {
+
         this.application = application;
+        this.displayWidth = displayWidth;
+        this.displayHeight = displayHeight;
+
         for (int i = 0; i < NUM_LINES; ++i) {
             consoleLines[i] = "Line " + i;
 
@@ -50,12 +61,16 @@ public class Hud {
         consoleNode.attachChild(background);
 
         application.getGuiNode().attachChild(consoleNode);
-    }
 
-    private void redraw() {
-        for (int i = 0; i < NUM_LINES; ++i) {
-            bitmapTextLines[i].setText(consoleLines[(currentLine  + i) % NUM_LINES]);
-        }
+        //final var guiFont = application.getAssetManager().loadFont("Interface/Fonts/Default.fnt");
+        BitmapText crosshairs = new BitmapText(font, false);
+        crosshairs.setSize(font.getCharSet().getRenderedSize() * 2f);
+        crosshairs.setText("+");
+        crosshairs.setLocalTranslation( // center
+                displayWidth / 2f - font.getCharSet().getRenderedSize() / 3f * 2f,
+                displayHeight / 2f + crosshairs.getLineHeight() / 2f, 0f);
+        application.getGuiNode().attachChild(crosshairs);
+
     }
 
     public void consoleAppend(final String text) {
@@ -67,10 +82,29 @@ public class Hud {
     }
 
     public void toggleVisibility() {
-        if(application.getGuiNode().hasChild(consoleNode)) {
+        if (application.getGuiNode().hasChild(consoleNode)) {
             application.getGuiNode().detachChild(consoleNode);
         } else {
             application.getGuiNode().attachChild(consoleNode);
+        }
+    }
+
+    public void showConsole() {
+        if (!application.getGuiNode().hasChild(consoleNode)) {
+            application.getGuiNode().attachChild(consoleNode);
+        }
+    }
+
+    public void hideConsole() {
+        if (application.getGuiNode().hasChild(consoleNode)) {
+            application.getGuiNode().detachChild(consoleNode);
+        }
+    }
+
+
+    private void redraw() {
+        for (int i = 0; i < NUM_LINES; ++i) {
+            bitmapTextLines[i].setText(consoleLines[(currentLine + i) % NUM_LINES]);
         }
     }
 }

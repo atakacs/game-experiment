@@ -6,8 +6,11 @@ import com.jme3.math.ColorRGBA;
 import com.jme3.renderer.RenderManager;
 import com.jme3.renderer.ViewPort;
 import com.jme3.scene.control.AbstractControl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HealthColorControl extends AbstractControl {
+    private static final Logger LOG = LoggerFactory.getLogger(HealthColorControl.class);
 
     private final Material material;
 
@@ -18,24 +21,29 @@ public class HealthColorControl extends AbstractControl {
 
     @Override
     protected void controlUpdate(final float tpf) {
-        var health = (Integer)spatial.getParent().getUserData("health");
+        var healthControl = spatial.getControl(HealthDestructionControl.class);
 
-        if(health == null) {
-            return;
+        if (healthControl == null) {
+            healthControl = spatial.getParent().getControl(HealthDestructionControl.class);
+
+            if (healthControl == null) {
+                return;
+            }
+
         }
 
-        if(health < 0) {
-            health = 0;
-        }
+        final var health = Math.max(healthControl.getHealth(), 0);
 
-        final var color = new ColorRGBA((100 - health)/100.0f, health/100.0f, 0.0f, 1.0f);
+        final var color = new ColorRGBA((100 - health) / 100.0f, health / 100.0f, 0.0f, 1.0f);
 
-        material.setBoolean("UseMaterialColors",true);
+        material.setBoolean("UseMaterialColors", true);
         material.setColor("Ambient", color);
         material.setColor("Diffuse", color);
+
         spatial.setMaterial(material);
     }
 
     @Override
-    protected void controlRender(final RenderManager rm, final ViewPort vp) {}
+    protected void controlRender(final RenderManager rm, final ViewPort vp) {
+    }
 }

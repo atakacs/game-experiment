@@ -12,7 +12,7 @@
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <maven.compiler.release>11</maven.compiler.release>
-        <jmonkey.version>3.3.2-stable</jmonkey.version>
+        <jmonkey.version>3.5.2-stable</jmonkey.version>
     </properties>
 
     <dependencies>
@@ -39,12 +39,12 @@
         <dependency>
             <groupId>org.jmonkeyengine</groupId>
             <artifactId>jme3-bullet</artifactId>
-            <version>${jmonkey.version}</version>
+            <version>3.3.2-stable</version>
         </dependency>
         <dependency>
             <groupId>org.jmonkeyengine</groupId>
             <artifactId>jme3-bullet-native</artifactId>
-            <version>${jmonkey.version}</version>
+            <version>3.3.2-stable</version>
         </dependency>
         <dependency>
             <groupId>org.jmonkeyengine</groupId>
@@ -54,7 +54,7 @@
         <dependency>
             <groupId>org.jmonkeyengine</groupId>
             <artifactId>jme3-testdata</artifactId>
-            <version>3.3.0-beta1</version>
+            <version>${jmonkey.version}</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
@@ -65,13 +65,17 @@
 
     <repositories>
         <repository>
-            <id>jcenter</id>
-            <url>https://jcenter.bintray.com/</url>
+            <id>central</id>
+            <url>https://repo1.maven.org/maven2/</url>
         </repository>
-        <repository>
-            <id>jmonkey</id>
-            <url>https://dl.bintray.com/jmonkeyengine/org.jmonkeyengine/</url>
-        </repository>
+        <!--        <repository>-->
+        <!--            <id>jcenter</id>-->
+        <!--            <url>https://jcenter.bintray.com/</url>-->
+        <!--        </repository>-->
+        <!--        <repository>-->
+        <!--            <id>jmonkey</id>-->
+        <!--            <url>https://dl.bintray.com/jmonkeyengine/org.jmonkeyengine/</url>-->
+        <!--        </repository>-->
     </repositories>
 
     <build>

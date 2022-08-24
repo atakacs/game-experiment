@@ -2,10 +2,9 @@ package nu.takacs.gametest;
 
 import com.jme3.anim.AnimClip;
 import com.jme3.anim.AnimComposer;
+import com.jme3.anim.SkinningControl;
 import com.jme3.anim.tween.Tween;
-import com.jme3.anim.tween.Tweens;
 import com.jme3.anim.tween.action.Action;
-import com.jme3.anim.tween.action.BaseAction;
 import com.jme3.anim.tween.action.LinearBlendSpace;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
@@ -21,8 +20,7 @@ import com.jme3.input.MouseInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
 import com.jme3.input.controls.MouseButtonTrigger;
-import com.jme3.light.AmbientLight;
-import com.jme3.light.PointLight;
+import com.jme3.light.DirectionalLight;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Node;
@@ -31,6 +29,7 @@ import com.jme3.system.AppSettings;
 import com.jme3.terrain.geomipmap.TerrainLodControl;
 import com.jme3.terrain.geomipmap.TerrainQuad;
 import com.jme3.util.SkyFactory;
+import nu.takacs.gametest.control.AiControl;
 import nu.takacs.gametest.control.HealthDestructionControl;
 import nu.takacs.gametest.control.TimedDestructionControl;
 import nu.takacs.gametest.factory.*;
@@ -87,8 +86,8 @@ public class Game extends SimpleApplication implements ActionListener {
     private void saveState() {
         LOG.info("Saving game state...");
 
-        BinaryExporter exporter = BinaryExporter.getInstance();
-        File file = new File("saved-state.j3o");
+        final BinaryExporter exporter = BinaryExporter.getInstance();
+        final File file = new File("saved-state.j3o");
         try {
             exporter.save(rootNode, file);
         } catch (IOException e) {
@@ -103,7 +102,7 @@ public class Game extends SimpleApplication implements ActionListener {
         setDisplayStatView(false);
         setDisplayFps(false);
 
-        hud = new Hud(this, guiFont);
+        hud = new Hud(this, guiFont, settings.getWidth(), settings.getHeight());
 
         terrainFactory = new TerrainFactory(this);
         explosionFactory = new ExplosionFactory(this);
@@ -148,22 +147,14 @@ public class Game extends SimpleApplication implements ActionListener {
         final var control = new TerrainLodControl(terrain, getCamera());
         terrain.addControl(control);
 
-        PointLight sunPointLight = new PointLight();
-        sunPointLight.setColor(ColorRGBA.White);
-        sunPointLight.setRadius(1000f);
-        sunPointLight.setPosition(new Vector3f(0.0f, 30.0f, 0.0f));
-        rootNode.addLight(sunPointLight);
-
-        AmbientLight al = new AmbientLight();
-        al.setColor(ColorRGBA.White.mult(0.5f));
-        rootNode.addLight(al);
-
-//        var terrain = assetManager.loadModel("Scenes/room.j3o");
-//        terrain.setLocalTranslation(0, -5.0f, 0);
+        DirectionalLight sun = new DirectionalLight();
+        sun.setColor(ColorRGBA.White);
+        sun.setDirection(new Vector3f(-.5f, -.5f, -.5f).normalizeLocal());
+        rootNode.addLight(sun);
 
         final CollisionShape sceneShape =
                 CollisionShapeFactory.createMeshShape(terrain);
-        var terrainBodyControl = new RigidBodyControl(sceneShape, 0);
+        final var terrainBodyControl = new RigidBodyControl(sceneShape, 0);
 
         terrain.addControl(terrainBodyControl);
 
@@ -232,9 +223,11 @@ public class Game extends SimpleApplication implements ActionListener {
                             body.applyImpulse(
                                     impulse, new Vector3f(0, 0, 0));
 
-                            final var currentHealth = (Integer) spatial.getUserData("health");
-                            if (currentHealth != null) {
-                                spatial.setUserData("health",
+
+                            final var healthControl = spatial.getControl(HealthDestructionControl.class);
+                            if (healthControl != null) {
+                                final var currentHealth = healthControl.getHealth();
+                                healthControl.setHealth(
                                         currentHealth - (int) (40.0f * (1.0f - normalizedDistance * normalizedDistance)));
                             }
                         }
@@ -257,29 +250,38 @@ public class Game extends SimpleApplication implements ActionListener {
 //
         final var npcModel = assetManager.loadModel("Models/Oto/Oto.mesh.xml");
 
+        npcModel.setName("npcModel");
         npcModel.setLocalScale(0.25f);
-        npcModel.setLocalTranslation(0.0f, 1.0f, 0.0f);
+        npcModel.setLocalTranslation(0.0f, 1.1f, 0.0f);
 
         final var npcSpatial = new Node("npcNode");
         npcSpatial.attachChild(npcModel);
-        final var animComposer = npcSpatial.getControl(AnimComposer.class);
+
+        final var animComposer = npcModel.getControl(AnimComposer.class);
         animComposer.actionBlended("Attack", new LinearBlendSpace(0f, 0.5f), "Dodge");
         for (AnimClip animClip : animComposer.getAnimClips()) {
+            LOG.debug("animClip: {}", animClip.getName());
+
             Action action = animComposer.action(animClip.getName());
-            if(!"stand".equals(animClip.getName())) {
-                action = new BaseAction(Tweens.sequence(action, Tweens.callMethod(this, "backToStand", animComposer)));
-            }
+//            if(!"stand".equals(animClip.getName())) {
+//                action = new BaseAction(Tweens.sequence(action, Tweens.callMethod(this, "backToStand", animComposer)));
+//            }
             animComposer.addAction(animClip.getName(), action);
         }
 
         final var npcControl = new BetterCharacterControl(1.0f, 2f, 50f);
         npcSpatial.addControl(npcControl);
+        npcControl.setPhysicsDamping(0.0f);
         bulletAppState.getPhysicsSpace().add(npcControl);
 
+        npcSpatial.addControl(new AiControl());
+
         final var spawnLocation = cam.getLocation()
-                .addLocal(cam.getDirection().normalizeLocal().multLocal(20.0f));
+                .addLocal(cam.getDirection().normalizeLocal().multLocal(5.0f));
         LOG.info("Spawn location = {}", spawnLocation);
         npcControl.warp(spawnLocation);
+
+        final var skinningControl = npcModel.getControl(SkinningControl.class);
 
         rootNode.attachChild(npcSpatial);
     }
@@ -289,9 +291,7 @@ public class Game extends SimpleApplication implements ActionListener {
     }
 
     private void createBox() {
-        final Spatial box = boxFactory.createBox();
-
-        final var healthDestructionControl = new HealthDestructionControl(spatial -> {
+        final Spatial box = boxFactory.createBox(spatial -> {
             bulletAppState.getPhysicsSpace().removeAll(spatial);
 
             LOG.debug("BOOM!");
@@ -301,7 +301,6 @@ public class Game extends SimpleApplication implements ActionListener {
             applyExplosionForce(spatial.getLocalTranslation());
         });
 
-        box.addControl(healthDestructionControl);
 
         final RigidBodyControl boxControl =
                 new RigidBodyControl(100.0f);
@@ -389,7 +388,7 @@ public class Game extends SimpleApplication implements ActionListener {
             if (isPressed) {
                 saveState();
             }
-        }else if (binding.equals("Console")) {
+        } else if (binding.equals("Console")) {
             if (isPressed) {
                 hud.toggleVisibility();
                 hud.consoleAppend("toggle");

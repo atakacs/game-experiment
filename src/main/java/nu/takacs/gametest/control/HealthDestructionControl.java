@@ -10,6 +10,7 @@ import java.util.function.Consumer;
 public class HealthDestructionControl extends AbstractControl {
 
     private final Consumer<Spatial> onBlowup;
+    private int health = 100;
 
     public HealthDestructionControl(final Consumer<Spatial> onBlowup) {
         this.onBlowup = onBlowup;
@@ -18,11 +19,18 @@ public class HealthDestructionControl extends AbstractControl {
 
     @Override
     protected void controlUpdate(final float tpf) {
-        final Object o = spatial.getUserData("health");
-        if(o instanceof Integer && ((Integer)o) < 1) {
+        if(health < 1) {
             spatial.removeFromParent();
             onBlowup.accept(spatial);
         }
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public void setHealth(final int health) {
+        this.health = health;
     }
 
     @Override
